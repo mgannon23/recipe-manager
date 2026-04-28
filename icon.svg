@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="#0d0d0d"/>
+
+  <!-- Pot body -->
+  <rect x="126" y="248" width="260" height="168" rx="24" fill="#4caf7d"/>
+
+  <!-- Pot rim -->
+  <rect x="106" y="228" width="300" height="32" rx="12" fill="#3a9668"/>
+
+  <!-- Left handle -->
+  <path d="M106 232 Q68 232 68 264 Q68 296 106 296" stroke="#3a9668" stroke-width="22" stroke-linecap="round" fill="none"/>
+
+  <!-- Right handle -->
+  <path d="M406 232 Q444 232 444 264 Q444 296 406 296" stroke="#3a9668" stroke-width="22" stroke-linecap="round" fill="none"/>
+
+  <!-- Lid -->
+  <rect x="126" y="196" width="260" height="40" rx="12" fill="#4caf7d"/>
+  <rect x="210" y="164" width="92" height="40" rx="10" fill="#3a9668"/>
+  <rect x="226" y="148" width="60" height="24" rx="12" fill="#4caf7d"/>
+
+  <!-- Steam lines -->
+  <path d="M192 138 Q178 114 192 90 Q206 66 192 42" stroke="#4caf7d" stroke-width="10" stroke-linecap="round" fill="none" opacity="0.55"/>
+  <path d="M256 128 Q242 104 256 80 Q270 56 256 32" stroke="#4caf7d" stroke-width="10" stroke-linecap="round" fill="none" opacity="0.55"/>
+  <path d="M320 138 Q306 114 320 90 Q334 66 320 42" stroke="#4caf7d" stroke-width="10" stroke-linecap="round" fill="none" opacity="0.55"/>
+</svg>
