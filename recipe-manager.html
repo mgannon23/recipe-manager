@@ -43,6 +43,13 @@
         }
 
         /* ── Header ── */
+        /* ── Sticky wrapper (header + tab bar scroll together) ── */
+        .sticky-top {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
         header {
             background: var(--primary);
             color: #fff;
@@ -51,9 +58,6 @@
             align-items: center;
             justify-content: space-between;
             box-shadow: 0 2px 6px rgba(0,0,0,0.18);
-            position: sticky;
-            top: 0;
-            z-index: 100;
         }
 
         header h1 { font-size: 1.25rem; font-weight: 600; letter-spacing: -0.2px; }
@@ -530,6 +534,20 @@
             margin-left: 4px;
         }
         .cb-pill-clear:hover { border-color: var(--error); color: var(--error); background: var(--error-bg); }
+
+        .cb-pill-more {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            border: 1.5px dashed var(--border);
+            background: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.15s, color 0.15s, border-color 0.15s;
+        }
+        .cb-pill-more:hover { border-color: var(--primary); color: var(--primary); }
 
         /* ── Recipe count ── */
         .cb-count {
@@ -1037,6 +1055,9 @@
 </head>
 <body>
 
+<!-- ══ Sticky header + tab bar ════════════════════════════════════════════════ -->
+<div class="sticky-top">
+
 <!-- ══ Header ══════════════════════════════════════════════════════════════════ -->
 <header>
     <h1>🍳 Recipe Manager</h1>
@@ -1054,6 +1075,8 @@
     <button class="tab active" id="tabImport"   onclick="switchTab('import')">Import Recipe</button>
     <button class="tab"        id="tabCookbook" onclick="switchTab('cookbook')">CookBook</button>
 </nav>
+
+</div><!-- /.sticky-top -->
 
 <!-- ══ Main ════════════════════════════════════════════════════════════════════ -->
 <main>
@@ -1395,6 +1418,8 @@ let photoState   = null;   // { file, objectUrl } | null
 
 // CookBook state
 let cbActiveTags     = new Set();   // active filter tags in cookbook grid
+let cbTagsExpanded   = false;       // whether the tag pill list is fully expanded
+const CB_TAGS_LIMIT  = 12;          // max pills shown before "+N more"
 let currentRecipeId  = null;
 let currentScale     = 1;
 let editSelectedTags = new Set();
@@ -1844,11 +1869,15 @@ function renderFilterPills() {
     const wrap = document.getElementById('cbFilterPills');
     wrap.innerHTML = '';
 
-    // Collect all tags actually used in recipes
-    const usedTags = new Set();
-    appData.recipes.forEach(r => (r.tags || []).forEach(t => usedTags.add(t)));
+    // Collect tags actually used in recipes, sorted alphabetically
+    const usedTags = [...new Set(
+        appData.recipes.flatMap(r => r.tags || [])
+    )].sort((a, b) => a.localeCompare(b));
 
-    usedTags.forEach(tag => {
+    const overflow    = usedTags.length > CB_TAGS_LIMIT;
+    const visibleTags = (overflow && !cbTagsExpanded) ? usedTags.slice(0, CB_TAGS_LIMIT) : usedTags;
+
+    visibleTags.forEach(tag => {
         const btn = document.createElement('button');
         btn.className = 'cb-pill' + (cbActiveTags.has(tag) ? ' on' : '');
         btn.textContent = tag;
@@ -1860,6 +1889,17 @@ function renderFilterPills() {
         };
         wrap.appendChild(btn);
     });
+
+    // "+N more" / "↑ Show less" toggle
+    if (overflow) {
+        const tog = document.createElement('button');
+        tog.className   = 'cb-pill-more';
+        tog.textContent = cbTagsExpanded
+            ? '↑ Show less'
+            : `+${usedTags.length - CB_TAGS_LIMIT} more`;
+        tog.onclick = () => { cbTagsExpanded = !cbTagsExpanded; renderFilterPills(); };
+        wrap.appendChild(tog);
+    }
 
     if (cbActiveTags.size > 0) {
         const clr = document.createElement('button');
@@ -1889,6 +1929,8 @@ function filterCookbook() {
         });
     }
 
+    // Sort alphabetically before rendering
+    recipes = [...recipes].sort((a, b) => a.title.localeCompare(b.title));
     renderRecipeGrid(recipes);
 }
 
@@ -2529,6 +2571,7 @@ function updateEditStepsPreview() {
 // copied from recipe websites
 function normalizeUnicodeFractions(str) {
     return str
+        .replace(/⁄/g, '/')  // Unicode FRACTION SLASH (looks like / but isn't) → regular slash
         .replace(/½/g, '1/2')
         .replace(/⅓/g, '1/3').replace(/⅔/g, '2/3')
         .replace(/¼/g, '1/4').replace(/¾/g, '3/4')
