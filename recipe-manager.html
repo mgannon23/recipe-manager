@@ -1383,7 +1383,9 @@ const IDB_STORE    = 'handles';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
-const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+// iPadOS 13+ reports as desktop Safari (Macintosh UA) — detect via touch + no File System Access API
+const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+                 (navigator.maxTouchPoints > 1 && !window.showDirectoryPicker);
 
 let dirHandle    = null;
 let savedHandle  = null;
