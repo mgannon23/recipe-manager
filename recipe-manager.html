@@ -603,6 +603,8 @@
             grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
             gap: 18px;
         }
+        /* JS-detected mobile: always 2 columns regardless of reported viewport width */
+        body.mobile .recipe-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
 
         .recipe-card {
             background: var(--surface);
@@ -1073,6 +1075,7 @@
             .detail-section-title { font-size: 0.74rem; }
             .row3 { grid-template-columns: 1fr; }
             .recipe-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
             .recipe-card-photo, .recipe-card-photo-placeholder { height: 100px; }
             .recipe-card-body { padding: 10px 12px 12px; gap: 5px; }
             .recipe-card-title { font-size: 0.85rem; }
@@ -1092,6 +1095,7 @@
 
         @media (max-width: 380px) {
             .recipe-grid { grid-template-columns: 1fr; }
+            body.mobile .recipe-grid { grid-template-columns: 1fr; }
             .recipe-card-photo, .recipe-card-photo-placeholder { height: 100px; }
         }
     </style>
@@ -1454,6 +1458,7 @@ const IDB_STORE      = 'handles';
 // iPadOS 13+ reports as desktop Safari (Macintosh UA) — detect via touch + no File System Access API
 const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
                  (navigator.maxTouchPoints > 1 && !window.showDirectoryPicker);
+if (isMobile) document.body.classList.add('mobile');
 
 let dirHandle    = null;
 let savedHandle  = null;
