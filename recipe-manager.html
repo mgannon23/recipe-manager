@@ -1072,11 +1072,11 @@
             .detail-meta-value { font-size: 0.9rem; }
             .detail-section-title { font-size: 0.74rem; }
             .row3 { grid-template-columns: 1fr; }
-            .recipe-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
-            .recipe-card-photo, .recipe-card-photo-placeholder { height: 120px; }
+            .recipe-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+            .recipe-card-photo, .recipe-card-photo-placeholder { height: 100px; }
             .recipe-card-body { padding: 10px 12px 12px; gap: 5px; }
-            .recipe-card-title { font-size: 0.88rem; }
-            .recipe-card-times { font-size: 0.72rem; }
+            .recipe-card-title { font-size: 0.85rem; }
+            .recipe-card-times { font-size: 0.7rem; }
             .scale-bar { gap: 7px; }
             .scale-btn { padding: 5px 9px; font-size: 0.78rem; }
             .ingredient-scaled-grid { grid-template-columns: 1fr; }
@@ -1092,6 +1092,7 @@
 
         @media (max-width: 380px) {
             .recipe-grid { grid-template-columns: 1fr; }
+            .recipe-card-photo, .recipe-card-photo-placeholder { height: 100px; }
         }
     </style>
 </head>
@@ -1588,6 +1589,20 @@ async function loadPhotoUrl(filename) {
     }
 }
 
+// Get photo URL - desktop from dirHandle, mobile from GitHub Pages
+function getPhotoUrl(filename) {
+    if (!filename) return null;
+    // Desktop: use cached blob URL if available
+    if (dirHandle && photoUrlCache.has(filename)) {
+        return photoUrlCache.get(filename);
+    }
+    // Mobile: return GitHub Pages URL
+    if (!dirHandle) {
+        return `https://mgannon23.github.io/recipe-manager/images/${filename}`;
+    }
+    return null;
+}
+
 // ─── Mobile load ───────────────────────────────────────────────────────────────
 
 async function handleMobileLoad(e) {
@@ -2023,12 +2038,25 @@ function renderRecipeGrid(recipes) {
             img.alt = recipe.title;
             img.style.opacity = '0';
             img.style.transition = 'opacity 0.2s';
+            img.onerror = () => { img.replaceWith(makePlaceholder()); };
             card.appendChild(img);
-            // Async load
-            loadPhotoUrl(recipe.photo).then(url => {
-                if (url) { img.src = url; img.style.opacity = '1'; }
-                else      { img.replaceWith(makePlaceholder()); }
-            });
+
+            // Check if mobile (no dirHandle) - use GitHub Pages URL directly
+            if (!dirHandle) {
+                const url = getPhotoUrl(recipe.photo);
+                if (url) {
+                    img.src = url;
+                    img.style.opacity = '1';
+                } else {
+                    img.replaceWith(makePlaceholder());
+                }
+            } else {
+                // Desktop: async load from dirHandle
+                loadPhotoUrl(recipe.photo).then(url => {
+                    if (url) { img.src = url; img.style.opacity = '1'; }
+                    else      { img.replaceWith(makePlaceholder()); }
+                });
+            }
         } else {
             card.appendChild(makePlaceholder());
         }
@@ -2107,15 +2135,29 @@ async function renderRecipeDetail(recipe) {
         placeholder.textContent = '🍽';
         card.appendChild(placeholder);
 
-        loadPhotoUrl(recipe.photo).then(url => {
+        // Check if mobile (no dirHandle) - use GitHub Pages URL directly
+        if (!dirHandle) {
+            const url = getPhotoUrl(recipe.photo);
             if (url) {
                 const img = document.createElement('img');
                 img.className = 'detail-hero';
                 img.src = url;
                 img.alt = recipe.title;
+                img.onerror = () => { img.replaceWith(placeholder); };
                 placeholder.replaceWith(img);
             }
-        });
+        } else {
+            // Desktop: async load from dirHandle
+            loadPhotoUrl(recipe.photo).then(url => {
+                if (url) {
+                    const img = document.createElement('img');
+                    img.className = 'detail-hero';
+                    img.src = url;
+                    img.alt = recipe.title;
+                    placeholder.replaceWith(img);
+                }
+            });
+        }
     } else {
         const ph = document.createElement('div');
         ph.className   = 'detail-hero-placeholder';
