@@ -448,6 +448,20 @@
             gap: 8px;
         }
 
+        .btn-reload-mobile {
+            background: none;
+            border: 1px solid var(--warn);
+            color: var(--warn);
+            border-radius: 4px;
+            padding: 2px 10px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            white-space: nowrap;
+            margin-left: auto;
+            transition: background 0.15s;
+        }
+        .btn-reload-mobile:hover { background: var(--warn-bg); }
+
         /* ── Mobile load card ── */
         .mobile-load-card {
             text-align: center;
@@ -548,6 +562,33 @@
             transition: background 0.15s, color 0.15s, border-color 0.15s;
         }
         .cb-pill-more:hover { border-color: var(--primary); color: var(--primary); }
+
+        /* ── Tag Filter toggle button ── */
+        .btn-tag-filter {
+            padding: 10px 16px;
+            background: var(--surface);
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 0.88rem;
+            font-weight: 500;
+            cursor: pointer;
+            white-space: nowrap;
+            flex-shrink: 0;
+            transition: background 0.15s, color 0.15s, border-color 0.15s;
+        }
+        .btn-tag-filter:hover { border-color: var(--primary); color: var(--primary); }
+        .btn-tag-filter.active { background: var(--primary-light); color: var(--primary); border-color: var(--primary); }
+
+        /* ── Group divider between meal-type and other tags ── */
+        .cb-filter-divider {
+            width: 1px;
+            height: 20px;
+            background: var(--border);
+            align-self: center;
+            flex-shrink: 0;
+            margin: 0 4px;
+        }
 
         /* ── Recipe count ── */
         .cb-count {
@@ -854,6 +895,7 @@
             font-size: 0.95rem;
             color: var(--text);
             line-height: 1.65;
+            white-space: pre-wrap;
         }
 
         /* ── Scaling bar ── */
@@ -1221,6 +1263,7 @@
         <!-- Mobile banner (always visible on mobile) -->
         <div class="mobile-banner" id="mobileBanner" style="display:none">
             📱 Browsing in read-only mode — editing requires the desktop app.
+            <button class="btn-reload-mobile" onclick="document.getElementById('mobileJsonFile').click()">Reload</button>
         </div>
 
         <!-- Mobile: load JSON file -->
@@ -1242,8 +1285,9 @@
             <div class="cb-toolbar">
                 <div class="cb-search-row">
                     <input type="text" id="cbSearch" placeholder="🔍  Search recipes by title or tag…" oninput="filterCookbook()">
+                    <button class="btn-tag-filter" id="btnTagFilter" onclick="toggleTagFilter()">Tags</button>
                 </div>
-                <div class="cb-filter-pills" id="cbFilterPills"></div>
+                <div class="cb-filter-pills" id="cbFilterPills" style="display:none"></div>
             </div>
             <div class="cb-count" id="cbCount"></div>
             <div class="recipe-grid" id="recipeGrid"></div>
@@ -1251,7 +1295,6 @@
 
         <!-- Full recipe view -->
         <div id="cbRecipeView" style="display:none">
-            <button class="btn-back" onclick="showCookbookGrid()">← Back to CookBook</button>
             <div id="recipeDetail"></div>
         </div>
 
@@ -1399,10 +1442,11 @@
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const DEFAULT_TAGS = ['breakfast','lunch','dinner','dessert','snack','appetizer','side dish'];
-const IDB_NAME     = 'RecipeManagerDB';
-const IDB_VER      = 1;
-const IDB_STORE    = 'handles';
+const DEFAULT_TAGS   = ['breakfast','lunch','dinner','dessert','snack','appetizer','side dish'];
+const MEAL_TYPE_TAGS = new Set(['breakfast','lunch','dinner','dessert','snack','appetizer','side dish']);
+const IDB_NAME       = 'RecipeManagerDB';
+const IDB_VER        = 1;
+const IDB_STORE      = 'handles';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -1418,8 +1462,7 @@ let photoState   = null;   // { file, objectUrl } | null
 
 // CookBook state
 let cbActiveTags     = new Set();   // active filter tags in cookbook grid
-let cbTagsExpanded   = false;       // whether the tag pill list is fully expanded
-const CB_TAGS_LIMIT  = 12;          // max pills shown before "+N more"
+let cbFilterExpanded = false;       // whether tag filter panel is open
 let currentRecipeId  = null;
 let currentScale     = 1;
 let editSelectedTags = new Set();
@@ -1558,6 +1601,8 @@ async function handleMobileLoad(e) {
         renderCookbookGrid();
     } catch (err) {
         toast('Could not read recipes.json: ' + err.message, 'error');
+    } finally {
+        e.target.value = '';  // Reset so same file can be reloaded
     }
 }
 
@@ -1800,6 +1845,7 @@ function switchTab(name) {
     document.getElementById('tabCookbook').classList.toggle('active', name === 'cookbook');
     document.getElementById('panelImport').classList.toggle('active',   name === 'import');
     document.getElementById('panelCookbook').classList.toggle('active', name === 'cookbook');
+    window.scrollTo(0, 0);
     if (name === 'cookbook') renderCookbook();
 }
 
@@ -1869,15 +1915,17 @@ function renderFilterPills() {
     const wrap = document.getElementById('cbFilterPills');
     wrap.innerHTML = '';
 
-    // Collect tags actually used in recipes, sorted alphabetically
-    const usedTags = [...new Set(
-        appData.recipes.flatMap(r => r.tags || [])
-    )].sort((a, b) => a.localeCompare(b));
+    // Visibility controlled by toggle state
+    wrap.style.display = cbFilterExpanded ? 'flex' : 'none';
+    updateTagFilterBtn();
+    if (!cbFilterExpanded) return;
 
-    const overflow    = usedTags.length > CB_TAGS_LIMIT;
-    const visibleTags = (overflow && !cbTagsExpanded) ? usedTags.slice(0, CB_TAGS_LIMIT) : usedTags;
+    // Collect tags actually used in recipes, split into meal-type and other
+    const usedTags  = [...new Set(appData.recipes.flatMap(r => r.tags || []))];
+    const mealTags  = usedTags.filter(t =>  MEAL_TYPE_TAGS.has(t)).sort((a, b) => a.localeCompare(b));
+    const otherTags = usedTags.filter(t => !MEAL_TYPE_TAGS.has(t)).sort((a, b) => a.localeCompare(b));
 
-    visibleTags.forEach(tag => {
+    const addPill = tag => {
         const btn = document.createElement('button');
         btn.className = 'cb-pill' + (cbActiveTags.has(tag) ? ' on' : '');
         btn.textContent = tag;
@@ -1888,26 +1936,39 @@ function renderFilterPills() {
             filterCookbook();
         };
         wrap.appendChild(btn);
-    });
+    };
 
-    // "+N more" / "↑ Show less" toggle
-    if (overflow) {
-        const tog = document.createElement('button');
-        tog.className   = 'cb-pill-more';
-        tog.textContent = cbTagsExpanded
-            ? '↑ Show less'
-            : `+${usedTags.length - CB_TAGS_LIMIT} more`;
-        tog.onclick = () => { cbTagsExpanded = !cbTagsExpanded; renderFilterPills(); };
-        wrap.appendChild(tog);
+    mealTags.forEach(addPill);
+
+    // Divider between groups (only when both have items)
+    if (mealTags.length > 0 && otherTags.length > 0) {
+        const div = document.createElement('div');
+        div.className = 'cb-filter-divider';
+        wrap.appendChild(div);
     }
+
+    otherTags.forEach(addPill);
 
     if (cbActiveTags.size > 0) {
         const clr = document.createElement('button');
         clr.className = 'cb-pill-clear';
-        clr.textContent = '✕ Clear filters';
+        clr.textContent = '✕ Clear';
         clr.onclick = () => { cbActiveTags.clear(); renderFilterPills(); filterCookbook(); };
         wrap.appendChild(clr);
     }
+}
+
+function toggleTagFilter() {
+    cbFilterExpanded = !cbFilterExpanded;
+    renderFilterPills();
+}
+
+function updateTagFilterBtn() {
+    const btn = document.getElementById('btnTagFilter');
+    if (!btn) return;
+    const count = cbActiveTags.size;
+    btn.textContent = count > 0 ? `Tags (${count})` : 'Tags';
+    btn.classList.toggle('active', cbFilterExpanded || count > 0);
 }
 
 function filterCookbook() {
@@ -1984,7 +2045,7 @@ function renderRecipeGrid(recipes) {
         if (recipe.tags && recipe.tags.length > 0) {
             const meta = document.createElement('div');
             meta.className = 'recipe-card-meta';
-            recipe.tags.forEach(t => {
+            sortTags(recipe.tags).forEach(t => {
                 const span = document.createElement('span');
                 span.className   = 'recipe-card-tag';
                 span.textContent = t;
@@ -2027,6 +2088,7 @@ async function openRecipe(id) {
     document.getElementById('cbGridView').style.display   = 'none';
     document.getElementById('cbEditPanel').style.display  = 'none';
     document.getElementById('cbRecipeView').style.display = 'block';
+    window.scrollTo(0, 0);
 
     await renderRecipeDetail(recipe);
 }
@@ -2108,7 +2170,7 @@ async function renderRecipeDetail(recipe) {
     if (recipe.tags && recipe.tags.length > 0) {
         const tagsDiv = document.createElement('div');
         tagsDiv.className = 'detail-tags';
-        recipe.tags.forEach(t => {
+        sortTags(recipe.tags).forEach(t => {
             const span = document.createElement('span');
             span.className   = 'detail-tag';
             span.textContent = t;
@@ -2273,6 +2335,7 @@ function showCookbookGrid() {
     document.getElementById('cbRecipeView').style.display = 'none';
     document.getElementById('cbEditPanel').style.display  = 'none';
     document.getElementById('cbGridView').style.display   = 'block';
+    window.scrollTo(0, 0);
 }
 
 // ─── CookBook: Delete ────────────────────────────────────────────────────────
@@ -2638,6 +2701,13 @@ function scaleIngredient(line, factor) {
 }
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
+
+function sortTags(tags) {
+    if (!tags || tags.length === 0) return [];
+    const meal  = tags.filter(t =>  MEAL_TYPE_TAGS.has(t)).sort((a, b) => a.localeCompare(b));
+    const other = tags.filter(t => !MEAL_TYPE_TAGS.has(t)).sort((a, b) => a.localeCompare(b));
+    return [...meal, ...other];
+}
 
 function escHtml(str) {
     return String(str)
