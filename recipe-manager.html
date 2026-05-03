@@ -1095,7 +1095,9 @@
 
         @media (max-width: 380px) {
             .recipe-grid { grid-template-columns: 1fr; }
-            body.mobile .recipe-grid { grid-template-columns: 1fr; }
+            /* body.mobile not overridden here — 360–380px phones are common Android sizes
+               and body.mobile .recipe-grid (specificity 0,2,1) already beats this plain
+               .recipe-grid rule (0,1,0), so mobile stays 2-column regardless */
             .recipe-card-photo, .recipe-card-photo-placeholder { height: 100px; }
         }
     </style>
